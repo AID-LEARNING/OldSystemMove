@@ -1,0 +1,5 @@
+name: OldSystemMove
+api: 5.0.0
+version: 0.0.1
+main: SenseiTarzan\OldSystemMove\Main
+description: optimizes pmmp on movemenent as it creates a lot of lag

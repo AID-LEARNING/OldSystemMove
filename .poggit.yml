@@ -1,0 +1,14 @@
+---
+branches:
+  - stable
+projects:
+  OldSystemMove:
+    path: ""
+    icon: "icon.png"
+    lint:
+      phpstan: false
+    libs:
+      - src: AID-LEARNING/ExtraEvent/libEventAttribute
+        version: ^1.0.2
+        branch: pm5
+...
