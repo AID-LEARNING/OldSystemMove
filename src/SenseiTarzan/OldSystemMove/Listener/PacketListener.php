@@ -4,26 +4,36 @@ namespace SenseiTarzan\OldSystemMove\Listener;
 
 use pocketmine\event\EventPriority;
 use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerChatEvent;
+use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\server\DataPacketDecodeEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\event\server\DataPacketSendEvent;
 use pocketmine\math\Facing;
 use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\handler\DeathPacketHandler;
 use pocketmine\network\mcpe\handler\InGamePacketHandler;
 use pocketmine\network\mcpe\NetworkSession;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\PlayerActionPacket;
 use pocketmine\network\mcpe\protocol\PlayerAuthInputPacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
+use pocketmine\network\mcpe\protocol\TickSyncPacket;
 use pocketmine\network\mcpe\protocol\types\PlayerAction;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementSettings;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementType;
 use pocketmine\network\PacketHandlingException;
+use pocketmine\player\Player;
+use pocketmine\scheduler\ClosureTask;
+use pocketmine\scheduler\Task;
 use pocketmine\timings\Timings;
+use pocketmine\utils\Random;
 use SenseiTarzan\ExtraEvent\Class\EventAttribute;
+use SenseiTarzan\OldSystemMove\Main;
 
 class PacketListener implements Listener
 {
+
 
     #[EventAttribute(EventPriority::MONITOR)]
     public function onSend(DataPacketSendEvent $event)
@@ -47,31 +57,33 @@ class PacketListener implements Listener
     #[EventAttribute(EventPriority::LOWEST)]
     public function onDataReceive(DataPacketReceiveEvent $event)
     {
-
         $packet = $event->getPacket();
         $origin = $event->getOrigin();
-        if ($packet instanceof MovePlayerPacket) {
-            $event->cancel();
-            $handlerTimings = Timings::getHandleDataPacketTimings($packet);
-            $handlerTimings->startTiming();
-            try{
-                if($this->handleMovePlayer($origin, $packet)){
-                    $origin->getLogger()->debug("Unhandled " . $packet->getName());
+        if ($origin->getHandler() instanceof InGamePacketHandler) {
+            if ($packet instanceof MovePlayerPacket) {
+                $event->cancel();
+                $handlerTimings = Timings::getHandleDataPacketTimings($packet);
+                $handlerTimings->startTiming();
+                try {
+                    if ($this->handleMovePlayer($origin, $packet)) {
+                        $origin->getLogger()->debug("Unhandled " . $packet->getName());
+                    }
+                } finally {
+                    $handlerTimings->stopTiming();
                 }
-            }finally{
-                $handlerTimings->stopTiming();
             }
-        }
-        if ($packet instanceof PlayerActionPacket) {
-            $event->cancel();
-            $handlerTimings = Timings::getHandleDataPacketTimings($packet);
-            $handlerTimings->startTiming();
-            try{
-                if($this->handlePlayerAction($origin, $packet)){
-                    $origin->getLogger()->debug("Unhandled " . $packet->getName());
+
+            if ($packet instanceof PlayerActionPacket) {
+                $event->cancel();
+                $handlerTimings = Timings::getHandleDataPacketTimings($packet);
+                $handlerTimings->startTiming();
+                try {
+                    if ($this->handlePlayerAction($origin, $packet)) {
+                        $origin->getLogger()->debug("Unhandled " . $packet->getName());
+                    }
+                } finally {
+                    $handlerTimings->stopTiming();
                 }
-            }finally{
-                $handlerTimings->stopTiming();
             }
         }
     }
@@ -84,9 +96,6 @@ class PacketListener implements Listener
             return false;
         }
         $handler = $session->getHandler();
-        if (!$handler instanceof InGamePacketHandler) {
-            return false;
-        }
         $rawPos = $packet->position;
         foreach ([$rawPos->x, $rawPos->y, $rawPos->z, $packet->yaw, $packet->headYaw, $packet->pitch] as $float) {
             if (is_infinite($float) || is_nan($float)) {
@@ -129,9 +138,6 @@ class PacketListener implements Listener
             return false;
         }
         $inGameHandler = $session->getHandler();
-        if (!$inGameHandler instanceof InGamePacketHandler) {
-            return false;
-        }
         $pos = new Vector3($packet->blockPosition->getX(), $packet->blockPosition->getY(), $packet->blockPosition->getZ());
 
         switch ($packet->action) {
